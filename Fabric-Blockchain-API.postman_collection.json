@@ -1,0 +1,204 @@
+{
+	"info": {
+		"_postman_id": "5e5d28d5-e8c5-4f52-b5bf-e9f9c063b70c",
+		"name": "Fabric Blockchain API",
+		"description": "Collection for testing a Hyperledger Fabric blockchain application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Admin Operations",
+			"item": [
+				{
+					"name": "Register Admin",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/blockchain/admin/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"blockchain",
+								"admin",
+								"register"
+							]
+						},
+						"description": "Registers a new admin user on the blockchain network. This operation generates a new UUID for the admin."
+					},
+					"response": []
+				}
+			],
+			"description": "Administrative operations for the blockchain network"
+		},
+		{
+			"name": "User Operations",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"userId\": \"{{$guid}}\",\n    \"role\": \"client\",\n    \"attributes\": \"organization=Org1\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/blockchain/users/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"blockchain",
+								"users",
+								"register"
+							]
+						},
+						"description": "Registers a new client user on the blockchain network"
+					},
+					"response": []
+				}
+			],
+			"description": "User management operations for the blockchain network"
+		},
+		{
+			"name": "Transaction Operations",
+			"item": [
+				{
+					"name": "Submit Transaction",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-ID",
+								"value": "{{userId}}",
+								"description": "UUID of the user submitting the transaction"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"functionName\": \"createAsset\",\n    \"arguments\": [\"asset1\", \"blue\", \"5\", \"owner1\", \"100\"],\n    \"transactionType\": \"invoke\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/blockchain/transactions",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"blockchain",
+								"transactions"
+							]
+						},
+						"description": "Submits a transaction to the blockchain network"
+					},
+					"response": []
+				},
+				{
+					"name": "Query Blockchain",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "User-ID",
+								"value": "{{userId}}",
+								"description": "UUID of the user querying the blockchain"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"functionName\": \"readAsset\",\n    \"arguments\": [\"asset1\"],\n    \"transactionType\": \"query\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/v1/blockchain/query",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"v1",
+								"blockchain",
+								"query"
+							]
+						},
+						"description": "Queries the blockchain ledger without modifying state"
+					},
+					"response": []
+				}
+			],
+			"description": "Operations for submitting transactions to the blockchain"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "userId",
+			"value": "",
+			"type": "string",
+			"description": "Store the UUID of a registered user here after registration"
+		}
+	]
+}
