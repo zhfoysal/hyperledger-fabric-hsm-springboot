@@ -8,6 +8,7 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
 import java.util.UUID;
+import java.util.function.Function;
 
 import org.hyperledger.fabric.client.Commit;
 import org.hyperledger.fabric.client.Contract;
@@ -47,6 +48,24 @@ public class TransactionServiceImpl implements TransactionService {
     @Value("${hsm.pin}")
     private String hsmPin;
 
+    @Value("${hsm.signature.algorithm}")
+    private String signatureAlgorithm;
+
+    @Value("${hsm.signature.provider}")
+    private String signatureProvider;
+
+    @Value("${fabric.messages.submit-success}")
+    private String submitSuccessMessage;
+
+    @Value("${fabric.messages.query-success}")
+    private String querySuccessMessage;
+
+    @Value("${fabric.messages.submit-error}")
+    private String submitErrorMessage;
+
+    @Value("${fabric.messages.query-error}")
+    private String queryErrorMessage;
+
     public TransactionServiceImpl(
             @Qualifier("gatewayBuilder") Gateway.Builder gatewayBuilder,
             @Qualifier("pkcs11KeyStore") KeyStore pkcs11KeyStore) {
@@ -59,63 +78,10 @@ public class TransactionServiceImpl implements TransactionService {
         try {
             log.info("Submitting transaction: {} for user: {}", transactionDto.getFunctionName(), userId);
 
-            // Retrieve user certificate and private key
-            KeyPair userKeyPair = getUserKeyPair(userId.toString());
-            X509Certificate certificate = (X509Certificate) pkcs11KeyStore.getCertificate(userId.toString());
-
-            // Create identity and connect to gateway
-            X509Identity identity = new X509Identity(mspId, certificate);
-            Gateway gateway = gatewayBuilder.identity(identity).connect();
-
-            try {
-                // Get network and contract
-                Network network = gateway.getNetwork(channelName);
-                Contract contract = network.getContract(chaincodeName);
-
-                // Prepare arguments
-                byte[][] args = convertArgsToBytes(transactionDto.getArguments());
-
-                // Create and sign proposal
-                Proposal proposal = contract.newProposal(transactionDto.getFunctionName())
-                        .addArguments(args)
-                        .build();
-
-                byte[] proposalDigest = proposal.getDigest();
-                byte[] signature = sign(proposalDigest, userKeyPair);
-
-                // Submit signed proposal
-                Proposal signedProposal = gateway.newSignedProposal(proposal.getBytes(), signature);
-                Transaction transaction = signedProposal.endorse();
-
-                // Sign and submit transaction
-                byte[] transactionDigest = transaction.getDigest();
-                byte[] transactionSignature = sign(transactionDigest, userKeyPair);
-
-                Transaction signedTransaction = gateway.newSignedTransaction(
-                        transaction.getBytes(), transactionSignature);
-
-                // Submit transaction and get commit status
-                Commit commit = signedTransaction.submitAsync();
-                byte[] commitDigest = commit.getDigest();
-                byte[] commitSignature = sign(commitDigest, userKeyPair);
-
-                Commit signedCommit = gateway.newSignedCommit(commit.getBytes(), commitSignature);
-                Status status = signedCommit.getStatus();
-
-                // Build response
-                return TransactionResponse.builder()
-                        .transactionId(proposal.getTransactionId())
-                        .successful(status.isSuccessful())
-                        .message("Transaction submitted successfully")
-                        .statusCode(status.getCode().getNumber())
-                        .blockNumber(status.getBlockNumber())
-                        .build();
-            } finally {
-                gateway.close();
-            }
+            return executeWithGateway(userId, transactionDto, this::processSubmitTransaction);
         } catch (Exception e) {
-            log.error("Failed to submit transaction: {}", e.getMessage(), e);
-            throw new BlockchainException("Failed to submit transaction: " + e.getMessage());
+            log.error("{}: {}", submitErrorMessage, e.getMessage(), e);
+            throw new BlockchainException(submitErrorMessage + ": " + e.getMessage());
         }
     }
 
@@ -124,50 +90,119 @@ public class TransactionServiceImpl implements TransactionService {
         try {
             log.info("Querying blockchain: {} for user: {}", transactionDto.getFunctionName(), userId);
 
-            // Retrieve user certificate and private key
-            KeyPair userKeyPair = getUserKeyPair(userId.toString());
-            X509Certificate certificate = (X509Certificate) pkcs11KeyStore.getCertificate(userId.toString());
-
-            // Create identity and connect to gateway
-            X509Identity identity = new X509Identity(mspId, certificate);
-            Gateway gateway = gatewayBuilder.identity(identity).connect();
-
-            try {
-                // Get network and contract
-                Network network = gateway.getNetwork(channelName);
-                Contract contract = network.getContract(chaincodeName);
-
-                // Prepare arguments
-                byte[][] args = convertArgsToBytes(transactionDto.getArguments());
-
-                // Create and sign proposal
-                Proposal proposal = contract.newProposal(transactionDto.getFunctionName())
-                        .addArguments(args)
-                        .build();
-
-                byte[] proposalDigest = proposal.getDigest();
-                byte[] signature = sign(proposalDigest, userKeyPair);
-
-                // Evaluate signed proposal
-                Proposal signedProposal = gateway.newSignedProposal(proposal.getBytes(), signature);
-                byte[] result = signedProposal.evaluate();
-
-                // Parse and return result
-                String resultStr = new String(result, StandardCharsets.UTF_8);
-
-                return TransactionResponse.builder()
-                        .transactionId(proposal.getTransactionId())
-                        .successful(true)
-                        .message("Query executed successfully")
-                        .result(resultStr)
-                        .build();
-            } finally {
-                gateway.close();
-            }
+            return executeWithGateway(userId, transactionDto, this::processQueryTransaction);
         } catch (Exception e) {
-            log.error("Failed to query blockchain: {}", e.getMessage(), e);
-            throw new BlockchainException("Failed to query blockchain: " + e.getMessage());
+            log.error("{}: {}", queryErrorMessage, e.getMessage(), e);
+            throw new BlockchainException(queryErrorMessage + ": " + e.getMessage());
         }
+    }
+
+    /**
+     * Common method to execute operations with gateway setup
+     */
+    private TransactionResponse executeWithGateway(UUID userId, TransactionDto transactionDto,
+            Function<GatewayContext, TransactionResponse> processor) throws Exception {
+        // Retrieve user certificate and private key
+        KeyPair userKeyPair = getUserKeyPair(userId.toString());
+        X509Certificate certificate = (X509Certificate) pkcs11KeyStore.getCertificate(userId.toString());
+
+        // Create identity and connect to gateway
+        X509Identity identity = new X509Identity(mspId, certificate);
+
+        try (Gateway gateway = gatewayBuilder.identity(identity).connect()) {
+            // Get network and contract
+            Network network = gateway.getNetwork(channelName);
+            Contract contract = network.getContract(chaincodeName);
+
+            // Prepare arguments
+            byte[][] args = convertArgsToBytes(transactionDto.getArguments());
+
+            // Create proposal
+            Proposal proposal = contract.newProposal(transactionDto.getFunctionName())
+                    .addArguments(args)
+                    .build();
+
+            GatewayContext context = new GatewayContext(gateway, proposal, userKeyPair, transactionDto);
+
+            return processor.apply(context);
+        }
+    }
+
+    /**
+     * Process a transaction submission
+     */
+    private TransactionResponse processSubmitTransaction(GatewayContext context) {
+        try {
+            Proposal proposal = context.proposal;
+            Gateway gateway = context.gateway;
+            KeyPair userKeyPair = context.userKeyPair;
+
+            // Sign and submit proposal
+            Proposal signedProposal = createSignedProposal(proposal, gateway, userKeyPair);
+            Transaction transaction = signedProposal.endorse();
+
+            // Sign and submit transaction
+            byte[] transactionDigest = transaction.getDigest();
+            byte[] transactionSignature = sign(transactionDigest, userKeyPair);
+
+            Transaction signedTransaction = gateway.newSignedTransaction(
+                    transaction.getBytes(), transactionSignature);
+
+            // Submit transaction and get commit status
+            Commit commit = signedTransaction.submitAsync();
+            byte[] commitDigest = commit.getDigest();
+            byte[] commitSignature = sign(commitDigest, userKeyPair);
+
+            Commit signedCommit = gateway.newSignedCommit(commit.getBytes(), commitSignature);
+            Status status = signedCommit.getStatus();
+
+            // Build response
+            return TransactionResponse.builder()
+                    .transactionId(proposal.getTransactionId())
+                    .successful(status.isSuccessful())
+                    .message(submitSuccessMessage)
+                    .statusCode(status.getCode().getNumber())
+                    .blockNumber(status.getBlockNumber())
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Error processing transaction submission", e);
+        }
+    }
+
+    /**
+     * Process a transaction query
+     */
+    private TransactionResponse processQueryTransaction(GatewayContext context) {
+        try {
+            Proposal proposal = context.proposal;
+            Gateway gateway = context.gateway;
+            KeyPair userKeyPair = context.userKeyPair;
+
+            // Sign proposal
+            Proposal signedProposal = createSignedProposal(proposal, gateway, userKeyPair);
+            byte[] result = signedProposal.evaluate();
+
+            // Parse and return result
+            String resultStr = new String(result, StandardCharsets.UTF_8);
+
+            return TransactionResponse.builder()
+                    .transactionId(proposal.getTransactionId())
+                    .successful(true)
+                    .message(querySuccessMessage)
+                    .result(resultStr)
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Error processing transaction query", e);
+        }
+    }
+
+    /**
+     * Create a signed proposal from an unsigned one
+     */
+    private Proposal createSignedProposal(Proposal proposal, Gateway gateway, KeyPair userKeyPair) throws Exception {
+        byte[] proposalDigest = proposal.getDigest();
+        byte[] signature = sign(proposalDigest, userKeyPair);
+        return gateway.newSignedProposal(proposal.getBytes(), signature);
     }
 
     /**
@@ -202,7 +237,7 @@ public class TransactionServiceImpl implements TransactionService {
         BigInteger halfCurveN = curveN.divide(BigInteger.valueOf(2));
 
         // Sign using PKCS11 provider
-        java.security.Signature signature = java.security.Signature.getInstance("NONEwithECDSA", "SunPKCS11-ForFabric");
+        java.security.Signature signature = java.security.Signature.getInstance(signatureAlgorithm, signatureProvider);
         signature.initSign(keyPair.getPrivate());
         signature.update(digest);
         byte[] rawSignature = signature.sign();
@@ -218,5 +253,11 @@ public class TransactionServiceImpl implements TransactionService {
         }
 
         return ecSignature.getBytes();
+    }
+
+    /**
+     * Context class to hold gateway-related objects
+     */
+    private record GatewayContext(Gateway gateway, Proposal proposal, KeyPair userKeyPair, TransactionDto transactionDto) {
     }
 }

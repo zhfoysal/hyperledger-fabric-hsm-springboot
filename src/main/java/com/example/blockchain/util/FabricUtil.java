@@ -1,5 +1,13 @@
 package com.example.blockchain.util;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.util.List;
+import java.util.stream.StreamSupport;
+
 import org.bouncycastle.asn1.ASN1Encodable;
 import org.bouncycastle.asn1.ASN1InputStream;
 import org.bouncycastle.asn1.ASN1Integer;
@@ -7,13 +15,6 @@ import org.bouncycastle.asn1.ASN1Primitive;
 import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.DERSequenceGenerator;
 import org.springframework.stereotype.Component;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.security.GeneralSecurityException;
-import java.util.List;
-import java.util.stream.StreamSupport;
 
 /**
  * Utility class for Fabric blockchain operations
@@ -78,10 +79,10 @@ public class FabricUtil {
     public static byte[] objectToBytes(Object obj) throws IOException {
         // String conversion to the byte array
         if (obj instanceof String) {
-            return ((String) obj).getBytes();
+            return ((String) obj).getBytes(StandardCharsets.UTF_8);
         }
 
         // For other types, you can use JSON serialization
-        return obj.toString().getBytes();
+        return obj.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

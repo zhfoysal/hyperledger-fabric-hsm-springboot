@@ -1,7 +1,16 @@
 package com.example.blockchain.util;
 
-import lombok.extern.slf4j.Slf4j;
-import org.bouncycastle.asn1.*;
+import java.io.ByteArrayInputStream;
+import java.io.StringWriter;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.MessageDigest;
+import java.security.PrivateKey;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.ExtensionsGenerator;
@@ -12,16 +21,10 @@ import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.bouncycastle.pkcs.jcajce.JcaPKCS10CertificationRequestBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.ByteArrayInputStream;
-import java.io.StringWriter;
-import java.math.BigInteger;
-import java.security.*;
-import java.security.cert.CertificateFactory;
-import java.security.cert.X509Certificate;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Utility class for cryptographic operations
@@ -29,6 +32,15 @@ import java.util.Base64;
 @Slf4j
 @Component
 public class CryptoUtil {
+
+    @Value("${crypto.hash-algorithm:SHA-256}")
+    private String hashAlgorithm;
+    
+    @Value("${crypto.signature-algorithm:SHA256withECDSA}")
+    private String signatureAlgorithm;
+    
+    @Value("${crypto.ec-curve:secp256r1}")
+    private String ecCurve;
 
     /**
      * Converts a PEM formatted certificate string to X509Certificate object
@@ -74,7 +86,7 @@ public class CryptoUtil {
     /**
      * Generate a Certificate Signing Request (CSR) from a key pair
      */
-    public static String generateCsr(KeyPair keyPair, String userId) throws Exception {
+    public String generateCsr(KeyPair keyPair, String userId) throws Exception {
         // Create X500Name - in this case just the CN, but you can add more attributes
         X500Name subject = new X500Name("CN=" + userId);
 
@@ -90,7 +102,7 @@ public class CryptoUtil {
         extensionsGenerator.addExtension(Extension.keyUsage, true, keyUsage);
 
         // Create content signer
-        ContentSigner signer = new JcaContentSignerBuilder("SHA256withECDSA").build(keyPair.getPrivate());
+        ContentSigner signer = new JcaContentSignerBuilder(signatureAlgorithm).build(keyPair.getPrivate());
 
         // Build the CSR
         PKCS10CertificationRequest csr = csrBuilder.build(signer);
@@ -106,11 +118,11 @@ public class CryptoUtil {
     }
 
     /**
-     * Generate a SHA-256 hash of a string
+     * Generate a hash of a string using configured hash algorithm
      */
-    public static String sha256Hash(String input) {
+    public String sha256Hash(String input) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(hashAlgorithm);
             byte[] hash = digest.digest(input.getBytes());
 
             // Convert byte array to hex string
@@ -122,7 +134,7 @@ public class CryptoUtil {
             }
             return hexString.toString();
         } catch (Exception e) {
-            log.error("Error generating SHA-256 hash: {}", e.getMessage(), e);
+            log.error("Error generating {} hash: {}", hashAlgorithm, e.getMessage(), e);
             throw new RuntimeException("Could not generate hash", e);
         }
     }

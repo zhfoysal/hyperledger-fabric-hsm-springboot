@@ -1,10 +1,19 @@
 package com.example.blockchain.service;
 
-import com.example.blockchain.api.dto.response.EnrollmentResponse;
-import com.example.blockchain.exception.BlockchainException;
-import com.example.blockchain.util.CertificateUtil;
-import com.example.blockchain.util.CryptoUtil;
-import lombok.extern.slf4j.Slf4j;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Provider;
+import java.security.spec.ECGenParameterSpec;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.Set;
+import java.util.UUID;
+
 import org.hyperledger.fabric.sdk.Enrollment;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric.sdk.identity.X509Enrollment;
@@ -14,15 +23,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.security.*;
-import java.security.spec.ECGenParameterSpec;
-import java.util.Base64;
-import java.util.Collections;
-import java.util.Set;
-import java.util.UUID;
+import com.example.blockchain.api.dto.response.EnrollmentResponse;
+import com.example.blockchain.exception.BlockchainException;
+import com.example.blockchain.util.CertificateUtil;
+import com.example.blockchain.util.CryptoUtil;
+
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -31,6 +37,7 @@ public class AdminServiceImpl implements AdminService {
     private final HFCAClient caClient;
     private final Provider pkcs11Provider;
     private final KeyStore pkcs11KeyStore;
+    private final CryptoUtil cryptoUtil;
     private volatile User caAdmin;
 
     @Value("${ca-admin.name}")
@@ -47,6 +54,21 @@ public class AdminServiceImpl implements AdminService {
 
     @Value("${hsm.pin}")
     private String hsmPin;
+    
+    @Value("${user.affiliation}")
+    private String userAffiliation;
+    
+    @Value("${user.max-enrollments}")
+    private int maxEnrollments;
+    
+    @Value("${admin.attribute.name}")
+    private String adminAttributeName;
+    
+    @Value("${admin.attribute.value}")
+    private String adminAttributeValue;
+    
+    @Value("${crypto.ec-curve}")
+    private String ecCurve;
 
     @Value("${file.certs.dir}")
     private String certsDir;
@@ -63,10 +85,12 @@ public class AdminServiceImpl implements AdminService {
     public AdminServiceImpl(
             HFCAClient caClient,
             @Qualifier("pkcs11Provider") Provider pkcs11Provider,
-            @Qualifier("pkcs11KeyStore") KeyStore pkcs11KeyStore) {
+            @Qualifier("pkcs11KeyStore") KeyStore pkcs11KeyStore,
+            CryptoUtil cryptoUtil) {
         this.caClient = caClient;
         this.pkcs11Provider = pkcs11Provider;
         this.pkcs11KeyStore = pkcs11KeyStore;
+        this.cryptoUtil = cryptoUtil;
     }
 
     @Override
@@ -77,7 +101,7 @@ public class AdminServiceImpl implements AdminService {
 
             // Generate key pair in HSM
             KeyPair keyPair = generateHsmKeyPair();
-            String csr = CryptoUtil.generateCsr(keyPair, adminIdStr);
+            String csr = cryptoUtil.generateCsr(keyPair, adminIdStr);
 
             // Register the admin with the CA
             String enrollmentSecret = registerAdminWithCA(adminIdStr);
@@ -89,7 +113,7 @@ public class AdminServiceImpl implements AdminService {
             storeAdminKeyPair(adminIdStr, keyPair, enrollment.getCert());
 
             // Calculate blockchain address
-            String bcAddress = CryptoUtil.sha256Hash(
+            String bcAddress = cryptoUtil.sha256Hash(
                     CertificateUtil.getUserID(enrollment.getCert().getBytes()));
 
             return EnrollmentResponse.builder()
@@ -110,9 +134,9 @@ public class AdminServiceImpl implements AdminService {
     private String registerAdminWithCA(String adminId) throws Exception {
         User caAdmin = getCaAdmin();
         org.hyperledger.fabric_ca.sdk.RegistrationRequest registrationRequest =
-            new org.hyperledger.fabric_ca.sdk.RegistrationRequest(adminId, "org1.department1");
-        registrationRequest.setMaxEnrollments(-1);
-        registrationRequest.addAttribute(new org.hyperledger.fabric_ca.sdk.Attribute("admin", "true"));
+            new org.hyperledger.fabric_ca.sdk.RegistrationRequest(adminId, userAffiliation);
+        registrationRequest.setMaxEnrollments(maxEnrollments);
+        registrationRequest.addAttribute(new org.hyperledger.fabric_ca.sdk.Attribute(adminAttributeName, adminAttributeValue));
         return caClient.register(registrationRequest, caAdmin);
     }
 
@@ -148,7 +172,7 @@ public class AdminServiceImpl implements AdminService {
      */
     private KeyPair generateHsmKeyPair() throws Exception {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC", pkcs11Provider);
-        ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256r1"); // P-256 curve
+        ECGenParameterSpec ecSpec = new ECGenParameterSpec(ecCurve);
         keyPairGenerator.initialize(ecSpec);
         return keyPairGenerator.generateKeyPair();
     }

@@ -1,5 +1,15 @@
 package com.example.blockchain.api.controller;
 
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.example.blockchain.api.dto.TransactionDto;
 import com.example.blockchain.api.dto.UserRegistrationDto;
 import com.example.blockchain.api.dto.response.ApiResponse;
@@ -8,13 +18,10 @@ import com.example.blockchain.api.dto.response.TransactionResponse;
 import com.example.blockchain.service.AdminService;
 import com.example.blockchain.service.TransactionService;
 import com.example.blockchain.service.UserService;
+
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -25,6 +32,18 @@ public class BlockchainController {
     private final UserService userService;
     private final AdminService adminService;
     private final TransactionService transactionService;
+    
+    @Value("${api.messages.admin-register-success}")
+    private String adminRegisterSuccessMessage;
+    
+    @Value("${api.messages.user-register-success}")
+    private String userRegisterSuccessMessage;
+    
+    @Value("${api.messages.transaction-submit-success}")
+    private String transactionSubmitSuccessMessage;
+    
+    @Value("${api.messages.query-success}")
+    private String querySuccessMessage;
 
     /**
      * Register a new admin user
@@ -37,7 +56,7 @@ public class BlockchainController {
         UUID adminId = UUID.randomUUID();
         EnrollmentResponse response = adminService.registerAdmin(adminId);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Admin registered successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, adminRegisterSuccessMessage));
     }
 
     /**
@@ -49,7 +68,7 @@ public class BlockchainController {
 
         EnrollmentResponse response = userService.registerUser(registrationDto);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "User registered successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, userRegisterSuccessMessage));
     }
 
     /**
@@ -64,7 +83,7 @@ public class BlockchainController {
 
         TransactionResponse response = transactionService.submitTransaction(transactionDto, userId);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Transaction submitted successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, transactionSubmitSuccessMessage));
     }
 
     /**
@@ -79,6 +98,6 @@ public class BlockchainController {
 
         TransactionResponse response = transactionService.queryTransaction(transactionDto, userId);
 
-        return ResponseEntity.ok(ApiResponse.success(response, "Query executed successfully"));
+        return ResponseEntity.ok(ApiResponse.success(response, querySuccessMessage));
     }
 }

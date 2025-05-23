@@ -1,26 +1,26 @@
 package com.example.blockchain.service;
 
-import com.example.blockchain.api.dto.UserRegistrationDto;
-import com.example.blockchain.api.dto.response.EnrollmentResponse;
-import com.example.blockchain.exception.BlockchainException;
-import com.example.blockchain.util.CertificateUtil;
-import com.example.blockchain.util.CryptoUtil;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.spec.ECGenParameterSpec;
+import java.util.UUID;
+
 import org.hyperledger.fabric.sdk.Enrollment;
 import org.hyperledger.fabric.sdk.User;
-import org.hyperledger.fabric.sdk.identity.X509Enrollment;
 import org.hyperledger.fabric_ca.sdk.EnrollmentRequest;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
-import java.security.spec.ECGenParameterSpec;
-import java.util.Base64;
-import java.util.UUID;
+import com.example.blockchain.api.dto.UserRegistrationDto;
+import com.example.blockchain.api.dto.response.EnrollmentResponse;
+import com.example.blockchain.exception.BlockchainException;
+import com.example.blockchain.util.CertificateUtil;
+import com.example.blockchain.util.CryptoUtil;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
@@ -29,12 +29,22 @@ public class UserServiceImpl implements UserService {
 
     private final HFCAClient caClient;
     private final AdminService adminService;
+    private final CryptoUtil cryptoUtil;
 
     @Value("${fabric.msp-id}")
     private String mspId;
 
     @Value("${ca-admin.org-name}")
     private String orgName;
+    
+    @Value("${user.affiliation}")
+    private String userAffiliation;
+    
+    @Value("${user.max-enrollments}")
+    private int maxEnrollments;
+    
+    @Value("${crypto.ec-curve}")
+    private String ecCurve;
 
     @Override
     public EnrollmentResponse registerUser(UserRegistrationDto registrationDto) {
@@ -44,7 +54,7 @@ public class UserServiceImpl implements UserService {
 
             // Generate key pair for the user
             KeyPair keyPair = generateKeyPair();
-            String csr = CryptoUtil.generateCsr(keyPair, userId);
+            String csr = cryptoUtil.generateCsr(keyPair, userId);
 
             // Register the user with the CA
             String enrollmentSecret = registerUserWithCA(userId);
@@ -56,7 +66,7 @@ public class UserServiceImpl implements UserService {
             storeUserCredentials(userId, keyPair, enrollment.getCert());
 
             // Create the enrollment response
-            String bcAddress = CryptoUtil.sha256Hash(
+            String bcAddress = cryptoUtil.sha256Hash(
                     CertificateUtil.getUserID(enrollment.getCert().getBytes()));
 
             return EnrollmentResponse.builder()
@@ -81,7 +91,7 @@ public class UserServiceImpl implements UserService {
             Enrollment enrollment = enrollUser(userIdStr, enrollmentSecret, csr, generateKeyPair());
 
             // Create the enrollment response
-            String bcAddress = CryptoUtil.sha256Hash(
+            String bcAddress = cryptoUtil.sha256Hash(
                     CertificateUtil.getUserID(enrollment.getCert().getBytes()));
 
             return EnrollmentResponse.builder()
@@ -100,8 +110,8 @@ public class UserServiceImpl implements UserService {
      */
     private String registerUserWithCA(String userId) throws Exception {
         User admin = adminService.getCaAdmin();
-        RegistrationRequest registrationRequest = new RegistrationRequest(userId, "org1.department1");
-        registrationRequest.setMaxEnrollments(-1);
+        RegistrationRequest registrationRequest = new RegistrationRequest(userId, userAffiliation);
+        registrationRequest.setMaxEnrollments(maxEnrollments);
         return caClient.register(registrationRequest, admin);
     }
 
@@ -120,7 +130,7 @@ public class UserServiceImpl implements UserService {
      */
     private KeyPair generateKeyPair() throws Exception {
         KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("EC");
-        ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256r1"); // P-256 curve
+        ECGenParameterSpec ecSpec = new ECGenParameterSpec(ecCurve);
         keyPairGenerator.initialize(ecSpec);
         return keyPairGenerator.generateKeyPair();
     }

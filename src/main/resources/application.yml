@@ -26,12 +26,22 @@ fabric:
     submit: 5
     commit: 60
 
+  # Transaction messages
+  messages:
+    submit-success: Transaction submitted successfully
+    query-success: Query executed successfully
+    submit-error: Failed to submit transaction
+    query-error: Failed to query blockchain
+
 # HSM Configuration
 hsm:
   name: ForFabric
   library: /usr/lib/x86_64-linux-gnu/softhsm/libsofthsm2.so
   slot: 1681257824
   pin: 98765432
+  signature:
+    algorithm: NONEwithECDSA
+    provider: SunPKCS11-ForFabric
 
 # CA Admin Configuration
 ca-admin:
@@ -53,7 +63,30 @@ file:
   priv-key-suffix: _priv.pem
   csr-suffix: _csr.pem
 
-# Logging Configuration
+# Crypto Configuration
+crypto:
+  hash-algorithm: SHA-256
+  signature-algorithm: SHA256withECDSA
+  ec-curve: secp256r1
+  
+# User and Admin Configuration
+user:
+  affiliation: org1.department1
+  max-enrollments: -1
+  
+admin:
+  attribute:
+    name: admin
+    value: true
+    
+# API Response Messages
+api:
+  messages:
+    admin-register-success: Admin registered successfully
+    user-register-success: User registered successfully
+    transaction-submit-success: Transaction submitted successfully
+    query-success: Query executed successfully
+
 logging:
   level:
     root: INFO
