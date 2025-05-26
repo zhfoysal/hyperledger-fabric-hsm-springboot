@@ -91,7 +91,7 @@ public class TransactionServiceImpl implements TransactionService {
     public TransactionResponse submitOfflineTransaction(TransactionDto transactionDto, UUID userId) {
         try {
             log.info("Submitting transaction: {} for user: {}", transactionDto.getFunctionName(), userId);
-            return executeWithGatewayUsingIdentity(userId, transactionDto, this::processOfflineSubmitTransaction);
+            return executeWithGateway(userId, transactionDto, this::processOfflineSubmitTransaction);
         } catch (Exception e) {
             log.error("{}: {}", submitErrorMessage, e.getMessage(), e);
             throw new BlockchainException(submitErrorMessage + ": " + e.getMessage());
@@ -102,7 +102,7 @@ public class TransactionServiceImpl implements TransactionService {
     public TransactionResponse queryTransaction(TransactionDto transactionDto, UUID userId) {
         try {
             log.info("Querying blockchain: {} for user: {}", transactionDto.getFunctionName(), userId);
-            return executeWithGatewayUsingIdentity(userId, transactionDto, this::processQueryTransaction);
+            return executeWithGateway(userId, transactionDto, this::processQueryTransaction);
         } catch (Exception e) {
             log.error("{}: {}", queryErrorMessage, e.getMessage(), e);
             throw new BlockchainException(queryErrorMessage + ": " + e.getMessage());
@@ -124,7 +124,7 @@ public class TransactionServiceImpl implements TransactionService {
     /**
      * Common method to execute operations with gateway setup using identity only
      */
-    private TransactionResponse executeWithGatewayUsingIdentity(UUID userId, TransactionDto transactionDto,
+    private TransactionResponse executeWithGateway(UUID userId, TransactionDto transactionDto,
             Function<GatewayOfflineContext, TransactionResponse> processor) throws Exception {
         UserIdentity userIdentity = getUserIdentity(userId);
 
