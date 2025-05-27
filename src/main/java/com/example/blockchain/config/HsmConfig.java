@@ -1,20 +1,24 @@
 package com.example.blockchain.config;
 
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-
 import java.security.KeyStore;
 import java.security.Provider;
 import java.security.Security;
 
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * Configuration for Hardware Security Module (HSM) integration
+ * This is the fallback/legacy configuration when Xipki enhanced mode is disabled
  */
 @Slf4j
 @Configuration
+@ConditionalOnProperty(name = "hsm.enhanced.enabled", havingValue = "false", matchIfMissing = false)
 public class HsmConfig {
 
     @Value("${hsm.name}")
@@ -46,7 +50,7 @@ public class HsmConfig {
             pkcs11Provider = pkcs11Provider.configure(config);
             Security.addProvider(pkcs11Provider);
 
-            log.info("Successfully configured PKCS11 provider for HSM: {}", hsmName);
+            log.info("Successfully configured standard PKCS11 provider for HSM: {}", hsmName);
             return pkcs11Provider;
         } catch (Exception e) {
             log.error("Failed to configure PKCS11 provider: {}", e.getMessage(), e);
@@ -63,7 +67,7 @@ public class HsmConfig {
         try {
             KeyStore keyStore = KeyStore.getInstance("PKCS11", pkcs11Provider);
             keyStore.load(null, hsmPin.toCharArray());
-            log.info("Successfully loaded PKCS11 KeyStore");
+            log.info("Successfully loaded standard PKCS11 KeyStore");
             return keyStore;
         } catch (Exception e) {
             log.error("Failed to load PKCS11 KeyStore: {}", e.getMessage(), e);

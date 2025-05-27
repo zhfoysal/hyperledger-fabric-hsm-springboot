@@ -58,6 +58,8 @@ dependencies {
     implementation 'org.bouncycastle:bcprov-jdk18on:1.78'
     implementation 'org.bouncycastle:bcpkix-jdk18on:1.78'
     implementation 'org.bouncycastle:bcutil-jdk18on:1.78'
+
+    implementation group: 'org.xipki.iaik', name: 'sunpkcs11-wrapper', version: '1.4.10'
     
     // Lombok
     compileOnly 'org.projectlombok:lombok'

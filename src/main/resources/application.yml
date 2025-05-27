@@ -43,6 +43,18 @@ hsm:
     algorithm: NONEwithECDSA
     provider: SunPKCS11-ForFabric
 
+  # Xipki Enhanced Configuration
+  enhanced:
+    enabled: true
+    provider:
+      name: XipkiPKCS11
+    cache:
+      enabled: true
+    max:
+      sessions: 20
+    session:
+      timeout: 300000
+
 # CA Admin Configuration
 ca-admin:
   name: admin
