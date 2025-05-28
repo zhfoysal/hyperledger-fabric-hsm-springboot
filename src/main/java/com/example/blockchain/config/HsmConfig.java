@@ -82,25 +82,28 @@ public class HsmConfig {
      */
     private void printKeyStoreContents(KeyStore keyStore) {
         try {
-            log.info("=== KeyStore Contents ===");
             Enumeration<String> aliases = keyStore.aliases();
             int keyCount = 0;
             int certCount = 0;
+            StringBuilder result = new StringBuilder();
+            result.append("=== KeyStore Contents ===\n");
             
             while (aliases.hasMoreElements()) {
                 String alias = aliases.nextElement();
                 
                 if (keyStore.isKeyEntry(alias)) {
-                    log.info("Private Key found - Alias: {}", alias);
+                    result.append("Private Key found - Alias: ").append(alias).append("\n");
                     keyCount++;
                 } else if (keyStore.isCertificateEntry(alias)) {
-                    log.info("Certificate found - Alias: {}", alias);
+                    result.append("Certificate found - Alias: ").append(alias).append("\n");
                     certCount++;
                 }
             }
             
-            log.info("Total keys found: {} private keys, {} certificates", keyCount, certCount);
-            log.info("=== End KeyStore Contents ===");
+            result.append("Total keys found: ").append(keyCount).append(" private keys, ").append(certCount).append(" certificates\n");
+            result.append("=== End KeyStore Contents ===");
+            
+            log.info(result.toString());
             
         } catch (Exception e) {
             log.warn("Failed to enumerate keystore contents: {}", e.getMessage());
