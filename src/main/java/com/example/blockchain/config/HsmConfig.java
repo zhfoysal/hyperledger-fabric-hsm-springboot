@@ -1,14 +1,16 @@
 package com.example.blockchain.config;
 
-import lombok.extern.slf4j.Slf4j;
+import java.security.KeyStore;
+import java.security.Provider;
+import java.security.Security;
+import java.util.Enumeration;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.security.KeyStore;
-import java.security.Provider;
-import java.security.Security;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * Configuration for Hardware Security Module (HSM) integration
@@ -64,10 +66,47 @@ public class HsmConfig {
             KeyStore keyStore = KeyStore.getInstance("PKCS11", pkcs11Provider);
             keyStore.load(null, hsmPin.toCharArray());
             log.info("Successfully loaded PKCS11 KeyStore");
+            
+            // Print all keys found in the keystore
+            printKeyStoreContents(keyStore);
+            
             return keyStore;
         } catch (Exception e) {
             log.error("Failed to load PKCS11 KeyStore: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to initialize HSM KeyStore", e);
+        }
+    }
+
+    /**
+     * Prints all keys and certificates found in the keystore
+     */
+    private void printKeyStoreContents(KeyStore keyStore) {
+        try {
+            Enumeration<String> aliases = keyStore.aliases();
+            int keyCount = 0;
+            int certCount = 0;
+            StringBuilder result = new StringBuilder();
+            result.append("=== KeyStore Contents ===\n");
+            
+            while (aliases.hasMoreElements()) {
+                String alias = aliases.nextElement();
+                
+                if (keyStore.isKeyEntry(alias)) {
+                    result.append("Private Key found - Alias: ").append(alias).append("\n");
+                    keyCount++;
+                } else if (keyStore.isCertificateEntry(alias)) {
+                    result.append("Certificate found - Alias: ").append(alias).append("\n");
+                    certCount++;
+                }
+            }
+            
+            result.append("Total keys found: ").append(keyCount).append(" private keys, ").append(certCount).append(" certificates\n");
+            result.append("=== End KeyStore Contents ===");
+            
+            log.info(result.toString());
+            
+        } catch (Exception e) {
+            log.warn("Failed to enumerate keystore contents: {}", e.getMessage());
         }
     }
 }

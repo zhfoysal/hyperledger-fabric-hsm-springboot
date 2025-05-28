@@ -87,6 +87,21 @@ public class BlockchainController {
     }
 
     /**
+     * Submit an OfflineTransaction to the blockchain
+     */
+    @PostMapping("/offline-transactions")
+    public ResponseEntity<ApiResponse<TransactionResponse>> submitOfflineTransaction(
+            @Valid @RequestBody TransactionDto transactionDto,
+            @RequestHeader("User-ID") UUID userId) {
+
+        log.info("Received request to submit transaction from user: {}", userId);
+
+        TransactionResponse response = transactionService.submitOfflineTransaction(transactionDto, userId);
+
+        return ResponseEntity.ok(ApiResponse.success(response, transactionSubmitSuccessMessage));
+    }
+
+    /**
      * Query the blockchain ledger
      */
     @PostMapping("/query")
